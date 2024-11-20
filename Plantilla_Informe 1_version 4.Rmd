@@ -1,0 +1,201 @@
+---
+title: "Trabajo Práctico Integrador"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(maps)
+library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE)
+
+meteoritos <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-06-11/meteorites.csv")
+
+
+```
+
+La base de datos `meteoritos` contiene información de impactos de meteoritos y su fuente es la NASA. Incluye información sobre más de 45.000 meteoritos, incluyendo su nombre, ubicación, masa y año de impacto. 
+
+### **Parte 1**
+
+**Pregunta:** ¿Cuál es la distribución geográfica de los meteoritos y donde cayeron los más pesados? 
+
+
+**Introducción:** *Tu introducción va aqui*
+
+La caída de meteoritos ha captado la atención de científicos e investigadores a lo largo de los años, principalmente debido a los impactos ambientales y geológicos que estos pueden causar. 
+En este análisis, exploraremos la base de datos recopilada por la NAsa para entender su distribución geográfica y localizar los meteoritos de mayor masa.
+
+
+**Enfoque:** *Tu forma de resolución va aquí*
+
+Para resolver esta tarea, usaremos herramientas de visualización y análisis de datos en R, particularmente con el paquete ggplot2. Primero, limpiaremos y prepararemos los datos filtrando aquellos con coordenadas geográficas válidas y datos de masa disponibles. Posteriormente, generaremos dos visualizaciones: un mapa de dispersión geográfico que muestra la ubicación de los meteoritos en el mundo y un gráfico que resalta dónde cayeron los meteoritos más pesados.
+
+**Analisis:**
+
+
+```{r}
+# Tu código de R va aquí# Cargar librerías necesarias
+meteoritos <- meteoritos %>% 
+  filter(!is.na(lat), !is.na(long), !is.na(mass))
+
+# Crear una nueva columna de peso en categorías (por ejemplo: <1kg, 1kg-100kg, >100kg)
+meteoritos <- meteoritos %>% 
+  mutate(mass_category = case_when(
+    mass < 1000 ~ "<1kg",
+    mass < 100000 ~ "1kg-100kg",
+    TRUE ~ ">100kg"
+  ))
+
+# Crear columna de continentes usando latitud y longitud
+# Aquí se usa una clasificación simplificada según la ubicación geográfica
+meteoritos <- meteoritos %>% 
+  mutate(continent = case_when(
+    lat > -60 & lat < 90 & long > -30 & long < 60 ~ "Europa",
+    lat > 0 & lat < 60 & long > 60 & long < 180 ~ "Asia",
+    lat > -40 & lat < 10 & long > -90 & long < -30 ~ "Sudamérica",
+    lat > -40 & lat < 10 & long > 110 & long < 180 ~ "Oceanía",
+    lat > 15 & lat < 60 & long > -140 & long < -30 ~ "América del Norte",
+    lat < -10 & lat > -60 & long > -180 & long < 180 ~ "Antártida",
+    TRUE ~ "África"
+  ))
+
+# Gráfico 1: Mapa con la masa representada en kg/tn
+ggplot() +
+  geom_polygon(data = world_map, aes(x = long, y = lat, group = group), fill = "gray90", color = "gray50") +
+  geom_point(data = meteoritos, aes(x = long, y = lat, size = mass / 1000, color = mass_category), alpha = 0.6) +
+  scale_size_continuous(name = "Masa (tn)", range = c(1, 10)) + # Escalando a toneladas
+  labs(title = "Distribución geográfica de los meteoritos", color = "Categoría de masa") +
+  theme_minimal()
+
+```
+
+```{r}
+# Tu código de R va aquí
+# Crear un diagrama de violín para visualizar la distribución de las masas por continente
+ggplot(meteoritos, aes(x = continent, y = mass, fill = continent)) +
+  geom_violin(trim = FALSE, alpha = 0.7) +
+  scale_y_log10() +  # Escala logarítmica para manejar la gran variación en las masas
+  labs(title = "Distribución de las Masas de Meteoritos por Continente",
+       x = "Continente",
+       y = "Masa (g)") +
+  theme_minimal() +
+  theme(legend.position = "none",  # Se puede ocultar la leyenda si el eje x ya es claro
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+**Discusión:** *Tu discusión de los resultados va aquí.*
+
+
+Los resultados muestran que la mayoría de los meteoritos se han encontrado en zonas de fácil acceso, como áreas habitadas y exploradas, debido al sesgo de descubrimiento humano. El análisis de los meteoritos más pesados, que se localizan en el gráfico, indica que estos impactos significativos han ocurrido en ubicaciones dispersas globalmente, aunque algunos puntos de concentración pueden observarse en regiones áridas como el desierto de Sahara y en áreas de América del Norte. Estos hallazgos subrayan la importancia de estos registros para estudiar los impactos pasados de meteoritos y su relación con las condiciones ambientales y de geología de las áreas donde fueron hallados.
+
+
+
+
+
+
+
+
+
+### **Parte 2**
+
+**Pregunta:** *¿Hay alguna relacion entre la clase del meteorito y sus zonas de impacto?*
+
+**Introducción:** En esta segunda parte del análisis, exploraremos la posible relación entre la clase de un meteorito y su zona de impacto. Utilizaremos visualizaciones de datos para identificar patrones espaciales y distribuciones de las diferentes clases de meteoritos a nivel continental. Al comparar la frecuencia de cada clase en distintos continentes y al mapear su ubicación geográfica, podremos inferir si existen preferencias geográficas en la distribución de los meteoritos.
+
+**Enfoque:** Mapa de puntos con facetas por clase de meteorito: Cada faceta representará una clase distinta, y cada punto indicará un impacto. Esto ayudará a ver si ciertas clases de meteoritos son más comunes en ciertas áreas.
+
+Gráfico de barras acumulado por clase y continente: Comparará la frecuencia de clases por continente para detectar si algunos tipos de meteoritos tienden a concentrarse en ciertas zonas geográficas.
+
+**Analisis:**
+
+```{r }
+# Tu código de R va aquí
+# Simplificar las clases a las 5 más comunes
+top_classes <- meteoritos %>%
+  count(class) %>%
+  top_n(5, wt = n) %>%
+  pull(class)
+
+# Filtrar para solo las 5 clases más comunes
+meteoritos_common <- meteoritos %>%
+  filter(class %in% top_classes)
+
+# 1. Gráfico de barras simplificado por continente y clase
+ggplot(meteoritos_common, aes(y = continent, fill = class)) +
+  geom_bar(position = "fill") +
+  labs(title = "Distribución Relativa de Clases de Meteoritos por Continente",
+       x = "Proporción" , y = "Continente") +
+  scale_fill_brewer(palette = "Set2", name = "Clase") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1))  # Rotar etiquetas del eje x
+
+```
+
+```{r }
+# Tu código de R va aquí
+# Crear una columna que clasifique los datos en intervalos de 100 años
+meteoritos <- meteoritos %>%
+  mutate(year_group = floor(year / 100) * 100)  # Agrupa por siglos
+
+# Crear categorías de masa con los nuevos rangos
+meteoritos <- meteoritos %>%
+  mutate(mass_category = case_when(
+    mass < 100 * 1000 ~ "Hasta 100 kg",       # Convertir a gramos
+    mass < 500 * 1000 ~ "Hasta 500 kg",       # Convertir a gramos
+    mass < 1000 * 1000 ~ "Hasta 1000 kg",     # Convertir a gramos
+    mass < 5000 * 1000 ~ "Hasta 5000 kg",     # Convertir a gramos
+    TRUE ~ "Más de 5000 kg"
+  ))
+# Filtrar los datos hasta el año 2013
+meteoritos_2013 <- meteoritos %>%
+  filter(year <= 2013)
+
+# Agrupar por continentes, intervalos de años y categorías de masa (hasta 2013)
+agrupados_2013 <- meteoritos_2013 %>%
+  group_by(continent = factor(continent, levels = c("África", "América del Norte", "América del Sur","Antártida", "Asia", "Europa", "Oceanía")), year_group, mass_category) %>%
+  summarise(
+    count = n(),
+    total_mass = sum(mass, na.rm = TRUE)
+  ) %>%
+  arrange(year_group, continent, mass_category)
+
+
+
+
+# Visualización mejorada
+ggplot(agrupados_2013, aes(x = mass_category, y = count, fill = continent)) +
+  geom_bar(stat = "identity", position = "stack", alpha = 0.85) +  # Ajustar opacidad para mejor visualización
+  scale_fill_brewer(palette = "Set1", name = "Categoría de Masa") +  # Cambiar paleta de colores
+  scale_y_log10(labels = scales::label_number()) +  # Etiquetas más legibles
+  labs(
+    title = "Distribución de Impactos de Meteoritos por Continente y Siglo",
+    x = "Continente",
+    y = "Número de Meteoritos",
+    caption = "Fuente: Dataset de la NASA"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje X
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.position = "right"
+  ) +
+  facet_wrap(~ year_group)  # Dividir por siglos
+
+
+```
+
+**Discusión:** interpretación de Resultados:
+
+Al analizar los gráficos, buscamos identificar:
+
+Desigualdades en la distribución: ¿Hay alguna clase de meteorito que sea significativamente más común en un continente determinado?
+
+Agrupamientos geográficos: ¿Existen regiones específicas donde se concentran ciertos tipos de meteoritos?
+
+Patrones inesperados: ¿Hay alguna relación entre la clase del meteorito y su ubicación geográfica que no se esperaba?
