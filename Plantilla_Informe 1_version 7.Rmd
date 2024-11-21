@@ -53,9 +53,6 @@ library(maps)
 world_map <- map_data("world")
 
 
-
-
-
 meteoritos <- meteoritos %>% 
   filter(!is.na(lat), !is.na(long), !is.na(mass))
 
@@ -84,7 +81,7 @@ meteoritos <- meteoritos %>%
 ggplot() +
   geom_polygon(data = world_map, aes(x = long, y = lat, group = group), fill = "gray90", color = "gray50") +
   geom_point(data = meteoritos, aes(x = long, y = lat, size = mass / 1000, color = mass_category), alpha = 0.6) +
-  scale_size_continuous(name = "Masa (tn)", range = c(1, 10)) + # Escalando a toneladas
+  scale_size_continuous(name = "Masa (kg)", range = c(1, 10)) +
   labs(title = "Distribución geográfica de los meteoritos", color = "Categoría de masa") +
   theme_minimal()
 
@@ -92,6 +89,9 @@ ggplot() +
 
 ```{r}
 # Tu código de R va aquí
+
+meteoritos <-- meteoritos %>%
+  filter( mass > 0)
 
 # Crear un diagrama de violín para visualizar la distribución de las masas por continente
 ggplot(meteoritos, aes(x = continent, y = mass/1000, fill = continent)) +
@@ -187,7 +187,8 @@ agrupados_2013 <- meteoritos_2013 %>%
   group_by(continent = factor(continent, levels = c("África", "América del Norte", "América del Sur","Antártida", "Asia", "Europa", "Oceanía")), year_group, mass_category) %>%
   summarise(
     count = n(),
-    total_mass = sum(mass, na.rm = TRUE)
+    total_mass = sum(mass, na.rm = TRUE),
+    .groups = "drop_last"
   ) %>%
   arrange(year_group, continent, mass_category)
 
